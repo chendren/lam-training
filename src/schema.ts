@@ -18,9 +18,9 @@ export const ToolSchema = z.object({
 
 export const SkillStepSchema = z.object({
   action: z.string(),
-  tool: z.string().optional(),
-  input: z.record(z.string()).optional(),
-  on_failure: z.enum(["stop", "skip", "retry"]).optional(),
+  tool: z.string().nullable().optional(),
+  input: z.record(z.any()).optional(),
+  on_failure: z.string().optional(),
 });
 
 export const SkillSchema = z.object({

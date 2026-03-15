@@ -11,7 +11,7 @@ import {
 const client = new Anthropic();
 
 const MODEL = "claude-sonnet-4-6";
-const BATCH_SIZE = 10; // examples per request within the batch
+const BATCH_SIZE = 4; // examples per request — each example is ~4K output tokens, 4 fits in 16K
 const OUTPUT_FILE = "output/training_data.jsonl";
 const BATCH_ID_FILE = "output/batch_id.txt";
 const RAW_RESULTS_FILE = "output/batch_results_raw.jsonl";
@@ -127,13 +127,17 @@ function toMLXFormat(example: TrainingExample): MLXTrainingExample {
 async function submitBatch() {
   console.log("\nBuilding batch requests...");
 
-  // 20 categories x 5 seeds = 100 requests, each generating 10 examples = 1000 total
+  // 20 categories x 5 seeds x ~3 rounds = 250 requests x 4 examples = 1000 total
   const requests: any[] = [];
+  const TARGET_REQUESTS = 250;
 
-  for (const category of CATEGORIES) {
-    for (let seedIdx = 0; seedIdx < category.seeds.length; seedIdx++) {
-      const seed = category.seeds[seedIdx];
-      const customId = `${category.name}_seed${seedIdx}`;
+  let round = 0;
+  while (requests.length < TARGET_REQUESTS) {
+    for (const category of CATEGORIES) {
+      for (let seedIdx = 0; seedIdx < category.seeds.length; seedIdx++) {
+        if (requests.length >= TARGET_REQUESTS) break;
+        const seed = category.seeds[seedIdx];
+        const customId = `${category.name}_seed${seedIdx}_r${round}`;
 
       requests.push({
         custom_id: customId,
@@ -156,7 +160,9 @@ async function submitBatch() {
           ],
         },
       });
+      }
     }
+    round++;
   }
 
   console.log(`Submitting batch: ${requests.length} requests x ${BATCH_SIZE} examples each = ${requests.length * BATCH_SIZE} target examples`);
