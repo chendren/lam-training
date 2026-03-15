@@ -1,0 +1,21 @@
+{
+  "name": "lam-training-data",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "submit": "tsx src/generate.ts submit",
+    "status": "tsx src/generate.ts status",
+    "collect": "tsx src/generate.ts collect",
+    "validate": "tsx src/validate.ts",
+    "stats": "tsx src/stats.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  }
+}
