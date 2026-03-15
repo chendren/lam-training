@@ -83,13 +83,39 @@ We use Claude to generate high-quality training pairs with three key techniques:
 
 The test scripts are included in this repo (`src/test-repetition.ts` and `src/test-repetition-multi.ts`) for reproducibility.
 
-#### Prompt Caching
+#### Prompt Caching & Batch API — Cost Analysis
 
-The system prompt (schema definition + rules) is identical across all 100 batch requests. By using `cache_control: { type: "ephemeral" }`, 99 of 100 requests read from cache at 90% discount.
+**The problem:** Our generation pipeline makes 100 API calls, each carrying an identical ~470-token system prompt containing the schema definition and rules. Without caching, every call re-processes these tokens at full input price.
 
-#### Batch API
+**The solution:** Anthropic's prompt caching (`cache_control: { type: "ephemeral" }`) caches the system prompt on the first call. The remaining 99 calls read from cache at 90% discount. Combined with the Batch API's flat 50% reduction on all token costs, the savings compound.
 
-50% cost reduction vs real-time API, no rate limits, Anthropic handles queuing and retries internally.
+**Pricing tiers (Claude Sonnet 4.6):**
+
+| Token Type | Standard Price | Batch Price (50% off) |
+|-----------|---------------|----------------------|
+| Input tokens | $3.00/M | $1.50/M |
+| Cache write | $3.75/M (1.25x input) | $1.875/M |
+| Cache read | $0.30/M (0.10x input) | $0.15/M |
+| Output tokens | $15.00/M | $7.50/M |
+
+**Cost calculation using observed token counts:**
+
+From our A/B test, each request generates ~4,000 output tokens and consumes ~1,500 input tokens (user prompt with instruction repetition) plus ~470 tokens (system prompt). Across 100 requests:
+
+| Component | No Caching, No Batch | With Caching + Batch | Savings |
+|-----------|---------------------|---------------------|---------|
+| System prompt (100 calls × 470 tokens) | 47,000 tokens × $3.00/M = $0.14 | 1 write (470 × $1.875/M) + 99 reads (46,530 × $0.15/M) = **$0.008** | 94% |
+| User prompt (100 × 1,500 tokens) | 150,000 × $3.00/M = $0.45 | 150,000 × $1.50/M = **$0.225** | 50% |
+| Output (100 × 4,000 tokens) | 400,000 × $15.00/M = $6.00 | 400,000 × $7.50/M = **$3.00** | 50% |
+| **Total** | **$6.59** | **$3.23** | **51%** |
+
+**Key takeaways:**
+1. **Prompt caching saves 94% on the system prompt** — but since the system prompt is only ~470 tokens per call, the absolute dollar savings are modest ($0.13). Caching matters more when system prompts are large (multi-thousand tokens).
+2. **The Batch API's 50% discount is the dominant cost saver** — it cuts $3.23 off the output token cost alone, which is where the real spend is.
+3. **Output tokens dominate cost.** At $15/M (standard) or $7.50/M (batch), the ~400K output tokens account for 91-93% of total cost regardless of caching strategy.
+4. **Combined savings: ~51% ($6.59 → $3.23)** for generating 1,000 training examples — roughly the cost of a coffee.
+
+The prompt caching technique becomes increasingly valuable at scale. For a 10,000-example dataset with a 2,000-token system prompt, cache reads would save ~$5.40 on top of the batch discount.
 
 ### 4. Output Schema
 
@@ -221,12 +247,12 @@ The 1,000 examples span 20 categories to ensure the model generalizes across dom
 
 ## Cost Breakdown
 
-| Item | Cost |
-|------|------|
-| Training data generation (Batch API) | ~$4-5 |
-| Fine-tuning (local, MLX) | $0 |
-| Inference (local) | $0 |
-| **Total** | **~$5** |
+| Item | Without Optimizations | With Caching + Batch | Savings |
+|------|----------------------|---------------------|---------|
+| Training data generation | ~$6.59 | **~$3.23** | 51% |
+| Fine-tuning (local, MLX) | $0 | $0 | — |
+| Inference (local) | $0 | $0 | — |
+| **Total** | **~$6.59** | **~$3.23** | **51%** |
 
 ## Key Research References
 
