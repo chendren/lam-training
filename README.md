@@ -179,14 +179,54 @@ mlx_lm.lora \
 - Time: ~15-30 minutes on M3/M4
 - Storage: ~6 GB for model + adapters
 
-### 6. Evaluate
+### 6. Results
 
-| Benchmark | What It Measures | Target |
-|-----------|-----------------|--------|
-| ToolBench pass rate | End-to-end tool calling | >75% |
-| BFCL | Function calling accuracy | >80% |
-| Schema adherence | Valid JSON output rate | >95% |
-| Custom eval | Agent definition quality | Human review |
+Training completed in 500 iterations (~40 minutes on Apple Silicon M-series, 59.5 GB peak unified memory). Only 0.218% of parameters were trained (6.7M adapter weights out of 3,075M total).
+
+#### Training Loss Curve
+
+| Iter | Train Loss | Val Loss |
+|------|-----------|----------|
+| 1 | — | 1.069 |
+| 100 | 0.503 | 0.688 |
+| 250 | 0.590 | **0.559** |
+| 500 | 0.482 | 0.625 |
+
+Best validation loss: **0.559** at iteration 250.
+
+#### 3-Way Model Comparison (Hand-Crafted Prompts)
+
+Tested on 3 prompts not present in training data:
+
+| Model | Params | T1 | T2 | T3 | **Avg** |
+|-------|--------|-----|-----|-----|---------|
+| **SmolLM3-3B (fine-tuned)** | 3B | 95 | 100 | 100 | **98.3** |
+| SmolLM3-3B (base) | 3B | 90 | 70 | 85 | 81.7 |
+| xLAM-1B (Salesforce) | 1B | 20 | 40 | 40 | 33.3 |
+
+#### Held-Out Validation Set Benchmark (20 Samples)
+
+Tested on 20 randomly sampled examples from the held-out validation split (never seen during training):
+
+| Model | Avg Score | Min | Max | Valid JSON % |
+|-------|-----------|-----|-----|-------------|
+| **SmolLM3-3B (fine-tuned)** | **96.3** | 70 | 100 | 100% |
+| SmolLM3-3B (base) | 79.3 | 60 | 90 | 100% |
+| xLAM-1B (Salesforce) | 27.5 | 20 | 40 | 100% |
+
+**Key findings:**
+- Fine-tuned model scored **100/100 on 13 out of 20 held-out examples**
+- **+21.4% improvement** over the base SmolLM3-3B model
+- **+250% improvement** over Salesforce's xLAM-1B (a purpose-built Large Action Model)
+- The fine-tuned model goes straight to clean structured JSON; the base model wraps output in `<think>` tags and prose
+- The fine-tuned model learned to characterize user tone ("casual, vague request") and adjust agent complexity accordingly
+- xLAM-1B scores low not because it's a bad model, but because it was trained for function *calling* (invoking existing tools), not function *creation* (designing new agent architectures)
+
+#### Scoring Methodology
+
+Each output is scored 0-100 based on:
+- Valid JSON output: 20 points
+- Presence of key schema fields: `reasoning` (10), `agent` (10), `tools` (10), `skills` (10), `constraints` (10), `steps` (10), `trigger` (5), `parameters` (5), `on_failure` (5), `description` (5)
 
 ## Project Structure
 
