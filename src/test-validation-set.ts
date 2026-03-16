@@ -3,10 +3,13 @@ import { readFileSync } from "fs";
 import { LAM_SYSTEM_PROMPT } from "./schema.js";
 
 const SMOLLM3_MODEL = "models/smollm3-3b-8bit";
+const QWEN3_MODEL = "models/qwen3-8b-8bit";
 const XLAM_MODEL = "models/xlam-1b-8bit";
 const ADAPTER_PATH = "adapters";
+const ADAPTER_V2_PATH = "adapters-v2";
+const QWEN3_ADAPTER_PATH = "adapters-qwen3";
 const VALID_FILE = "output/valid.jsonl";
-const SAMPLE_SIZE = 20; // test 20 random validation examples
+const SAMPLE_SIZE = 20;
 
 interface ModelConfig {
   label: string;
@@ -15,9 +18,8 @@ interface ModelConfig {
 }
 
 const MODELS: ModelConfig[] = [
-  { label: "SmolLM3-3B (base)", model: SMOLLM3_MODEL },
-  { label: "SmolLM3-3B (fine-tuned)", model: SMOLLM3_MODEL, adapter: ADAPTER_PATH },
-  { label: "xLAM-1B (Salesforce)", model: XLAM_MODEL },
+  { label: "SmolLM3-3B v1", model: SMOLLM3_MODEL, adapter: ADAPTER_PATH },
+  { label: "SmolLM3-3B v2 (+targeted)", model: SMOLLM3_MODEL, adapter: ADAPTER_V2_PATH },
 ];
 
 function runInference(prompt: string, model: string, adapterPath?: string): string {
