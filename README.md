@@ -210,17 +210,22 @@ Tested on 20 randomly sampled examples from the held-out validation split (never
 
 | Model | Avg Score | Min | Max | Valid JSON % |
 |-------|-----------|-----|-----|-------------|
-| **SmolLM3-3B (fine-tuned)** | **96.3** | 70 | 100 | 100% |
+| **SmolLM3-3B v2 (+targeted)** | **98.5** | **95** | **100** | 100% |
+| SmolLM3-3B v1 | 92.5 | 65 | 100 | 100% |
+| Qwen3-8B (fine-tuned) | 92.0 | 65 | 100 | 100% |
 | SmolLM3-3B (base) | 79.3 | 60 | 90 | 100% |
 | xLAM-1B (Salesforce) | 27.5 | 20 | 40 | 100% |
 
 **Key findings:**
-- Fine-tuned model scored **100/100 on 13 out of 20 held-out examples**
-- **+21.4% improvement** over the base SmolLM3-3B model
-- **+250% improvement** over Salesforce's xLAM-1B (a purpose-built Large Action Model)
+- **v2 model never scores below 95** on any held-out example (v1 min was 65)
+- **+24.2% improvement** over the base SmolLM3-3B model
+- **+258% improvement** over Salesforce's xLAM-1B (a purpose-built Large Action Model)
+- Targeted training on 269 enterprise/complex examples (generated via Inception Mercury 2 for ~$1) eliminated the long tail of weak performance
+- Enterprise orchestration: 70 to 100, infrastructure monitoring: 75 to 95, SDK docs sync: 65 to 95
 - The fine-tuned model goes straight to clean structured JSON; the base model wraps output in `<think>` tags and prose
 - The fine-tuned model learned to characterize user tone ("casual, vague request") and adjust agent complexity accordingly
 - xLAM-1B scores low not because it's a bad model, but because it was trained for function *calling* (invoking existing tools), not function *creation* (designing new agent architectures)
+- Qwen3-8B (2.7x larger) produces richer reasoning but scores comparably to SmolLM3-3B, at 2x the inference latency
 
 #### Scoring Methodology
 
@@ -271,28 +276,26 @@ npm run stats
 
 ## Training Data Categories
 
-The 1,000 examples span 20 categories to ensure the model generalizes across domains:
+The v2 dataset contains 1,580 training examples from three sources:
 
-| Category | Examples |
-|----------|----------|
-| Code Review | PR security scanning, style enforcement, anti-pattern detection |
-| DevOps Automation | Blue-green deploys, canary releases, auto-scaling |
-| Data Pipeline | ETL orchestration, schema validation, deduplication |
-| Testing | Unit test generation, regression detection, load testing |
-| Security | Dependency scanning, secrets detection, IAM auditing |
-| Monitoring & Alerting | Latency tracking, anomaly detection, incident routing |
-| ML Ops | Model drift detection, A/B testing, hyperparameter optimization |
-| Multi-Agent Orchestration | Planner-worker systems, debate agents, pipeline chains |
-| ... and 12 more | Documentation, compliance, cost optimization, onboarding, etc. |
+**Phase 1: Broad coverage (992 examples via Claude Sonnet 4.6 Batch API)**
+20 categories including code review, DevOps, data pipeline, testing, security, monitoring, ML ops, multi-agent orchestration, compliance, cost optimization, onboarding, and more.
+
+**Phase 2: Targeted weak-category reinforcement (269 examples via Inception Mercury 2)**
+Enterprise API lifecycle, cross-team communication orchestration, complex report pipelines, multi-agent systems, infrastructure compliance, security posture management, and formal workflow automation.
+
+**Phase 3: Anti-forgetting mix (500 ToolACE + general conversation)**
+Prevents catastrophic forgetting of structured JSON output patterns and general instruction following.
 
 ## Cost Breakdown
 
-| Item | Without Optimizations | With Caching + Batch | Savings |
-|------|----------------------|---------------------|---------|
-| Training data generation | ~$6.59 | **~$3.23** | 51% |
-| Fine-tuning (local, MLX) | $0 | $0 | — |
-| Inference (local) | $0 | $0 | — |
-| **Total** | **~$6.59** | **~$3.23** | **51%** |
+| Item | Cost | Notes |
+|------|------|-------|
+| Phase 1: Claude Batch API (992 examples) | ~$3.23 | 50% batch discount + prompt caching |
+| Phase 2: Mercury 2 API (269 examples) | ~$1.00 | $0.75/M output tokens, 158 seconds |
+| Fine-tuning (local, MLX) | $0 | Apple Silicon, ~40 min per run |
+| Inference (local) | $0 | ~80 tok/s on M-series Mac |
+| **Total** | **~$4.23** | |
 
 ## Key Research References
 
